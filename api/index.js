@@ -12,7 +12,6 @@ app.get('/api/hello', (req, res) => {
 });
 
 
-app.listen(7000)
 
 
 // Export handler for Vercel

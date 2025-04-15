@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 const serverless = require("serverless-http");
 const router = require("../src/router/resultRoutes");
-const cors = require("cors")
+const cors = require("cors");
 require("../src/config/dbconnect.js");
 // Middleware
 app.use(cors());
@@ -14,8 +14,8 @@ app.get("/api/hello", (req, res) => {
   res.json({ message: "Hello from Vercel Serverless!" });
 });
 
-app.listen(5000);
+// app.listen(5000);
 // Export handler for Vercel
 module.exports = app;
 
-// module.exports.handler = serverless(app);
+module.exports.handler = serverless(app);

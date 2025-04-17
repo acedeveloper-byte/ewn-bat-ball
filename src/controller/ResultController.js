@@ -55,11 +55,12 @@ const FetchAllResult = async (req, res) => {
 };
 
 const UpdateResult = async (req, res) => {
+  const { _id } = req.params;
   const { categoryname, time, number, next_result } = req.body;
-  const findAllResult = await Result.findOne({ categoryname: categoryname });
+  const findAllResult = await Result.findOne({ _id: _id });
   if (findAllResult.length !== 0) {
     const udpdate = await ResultsModel.updateOne(
-      { categoryname: categoryname }, // Match by categoryname
+      { _id: _id }, // Match by categoryname
       {
         $push: { result: { time, number } }, // Add new entry to the result array
         $set: { number, next_result }, // Update number and next_result fields

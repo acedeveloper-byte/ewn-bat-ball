@@ -1,14 +1,19 @@
+const CategoryKeyModel = require("../models/KeyModel");
 const ResultsModel = require("../models/ResultModel");
 const Result = require("../models/ResultModel");
 
 const CreateNewResult = async (req, res) => {
-  const { categoryname, date, result, number, next_result } = req.body;
+  const { categoryname, date, result, number, next_result, key } = req.body;
 
-  const findExisting = await Result.findOne({ categoryname });
-  if (findExisting) {
-    res
-      .status(200)
-      .json({ baseResponse: { status: 0, message: "Already Exist" } });
+  const findExisting = await CategoryKeyModel.findOne({ key });
+  console.log("findExisting:", findExisting);
+  if (findExisting === null) {
+    res.status(200).json({
+      baseResponse: {
+        status: 0,
+        message: "Please enter a valid key as this is invalid",
+      },
+    });
   }
   const newResult = new Result({
     categoryname,
@@ -74,4 +79,55 @@ const UpdateResult = async (req, res) => {
   }
 };
 
-module.exports = { CreateNewResult, FetchAllResult, UpdateResult };
+const AddKeyForResultUpdation = async (req, res) => {
+  const { key, categoryname } = req.body;
+
+  const findOne = await CategoryKeyModel.findOne({ key: key });
+  if (findOne === null) {
+    const findOneName = await CategoryKeyModel.findOne({
+      categoryname: categoryname,
+    });
+    if (findOneName === null) {
+      const NewGenetration = new CategoryKeyModel({ key, categoryname });
+      res.status(200).json({
+        baseResponse: { message: "Key Added succefully", status: 1 },
+        response: await NewGenetration.save(),
+      });
+    } else {
+      res.status(200).json({
+        baseResponse: {
+          message: "Category already exist please contact admin",
+          status: 0,
+        },
+      });
+    }
+  } else {
+    res.status(200).json({
+      baseResponse: {
+        message: "Key already exist please contact admin",
+        status: 0,
+      },
+    });
+  }
+};
+
+const FetchAllCategories = async (req, res) => {
+  const findAllCategory = await CategoryKeyModel.find({});
+
+  if (findAllCategory.length !== 0) {
+    res.status(200).json({
+      baseResponse: { message: "Fetch all", status: 1 },
+      data: findAllCategory,
+    });
+  } else {
+    res.status(200).json({ baseResponse: { message: "Fetch all", status: 1 } });
+  }
+};
+
+module.exports = {
+  CreateNewResult,
+  FetchAllResult,
+  UpdateResult,
+  AddKeyForResultUpdation,
+  FetchAllCategories,
+};

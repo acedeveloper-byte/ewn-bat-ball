@@ -125,10 +125,32 @@ const FetchAllCategories = async (req, res) => {
   }
 };
 
+const GetResultsWithDate = async (req, res) => {
+  const { date, categoryname } = req.params;
+  const findAllCategory = await ResultsModel.find({
+    date: date,
+    categoryname: categoryname,
+  });
+
+  console.log(findAllCategory.length);
+
+  if (findAllCategory.length !== 0) {
+    res.status(200).json({
+      baseResponse: { message: "Fetch all", status: 1 },
+      data: findAllCategory,
+    });
+  } else {
+    res
+      .status(200)
+      .json({ baseResponse: { message: "Not able to fetch", status: 0 } });
+  }
+};
+
 module.exports = {
   CreateNewResult,
   FetchAllResult,
   UpdateResult,
   AddKeyForResultUpdation,
   FetchAllCategories,
+  GetResultsWithDate,
 };

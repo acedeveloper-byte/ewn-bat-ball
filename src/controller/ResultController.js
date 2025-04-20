@@ -84,6 +84,8 @@ const AddKeyForResultUpdation = async (req, res) => {
 	const { key, categoryname } = req.body;
 
 	const findOne = await CategoryKeyModel.findOne({ key: key });
+	console.log(findOne);
+
 	if (findOne === null) {
 		const findOneName = await CategoryKeyModel.findOne({
 			categoryname: categoryname,
@@ -131,8 +133,6 @@ const GetResultsWithDate = async (req, res) => {
 		date: date,
 		categoryname: categoryname,
 	});
-
-	console.log(findAllCategory.length);
 
 	if (findAllCategory.length !== 0) {
 		res.status(200).json({

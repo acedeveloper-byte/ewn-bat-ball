@@ -17,8 +17,8 @@ app.get("/api/hello", (req, res) => {
   res.json({ message: "Hello from Vercel Serverless!" });
 });
 
-app.listen(5000);
+// app.listen(5000);
 // Export handler for Vercel
 module.exports = app;
 
-// module.exports.handler = serverless(app);
+module.exports.handler = serverless(app);

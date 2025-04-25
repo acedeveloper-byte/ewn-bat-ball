@@ -3,32 +3,50 @@ const ResultsModel = require("../models/ResultModel");
 const Result = require("../models/ResultModel");
 
 const CreateNewResult = async (req, res) => {
-  const { categoryname, date, result, number, next_result, key } = req.body;
-
+  const { categoryname, date, result, number, next_result, key, time } =
+    req.body;
   const findExisting = await CategoryKeyModel.findOne({ key });
+  const findExistingCat = await ResultsModel.findOne({ categoryname });
 
-  if (findExisting === null) {
+  console.log("findExisting:", findExisting);
+  if (findExisting !== null) {
+    if (findExistingCat !== null) {
+      const udpdate = await ResultsModel.updateOne(
+        { categoryname: categoryname }, // Match by categoryname
+        {
+          $push: { result: { time, number } }, // Add new entry to the result array
+          $set: { next_result }, // Update number and next_result fields
+        },
+        { new: true, upsert: true }
+      );
+
+      res.status(201).json({
+        message: "Result Updated successfully",
+        data: udpdate,
+      });
+    } else {
+      const newResult = new Result({
+        categoryname,
+        date,
+        result,
+        number,
+        next_result,
+        key,
+      });
+
+      await newResult.save();
+
+      return res.status(201).json({
+        message: "Result created successfully",
+        data: newResult,
+      });
+    }
+  } else {
     res.status(200).json({
-      baseResponse: {
-        status: 0,
-        message: "Please enter a valid key as this is invalid",
-      },
+      message: "Please enter a valid key",
+      data: [],
     });
   }
-  const newResult = new Result({
-    categoryname,
-    date,
-    result,
-    number,
-    next_result,
-  });
-
-  await newResult.save();
-
-  return res.status(201).json({
-    message: "Result created successfully",
-    data: newResult,
-  });
 };
 
 const FetchAllResult = async (req, res) => {
@@ -130,7 +148,7 @@ const AddKeyForResultUpdation = async (req, res) => {
   } else {
     res.status(200).json({
       baseResponse: {
-        message: "Key already exist please contact admin",	
+        message: "Key already exist please contact admin",
         status: 0,
       },
     });
@@ -152,20 +170,39 @@ const FetchAllCategories = async (req, res) => {
 
 const GetResultsWithDate = async (req, res) => {
   const { date, categoryname } = req.params;
-  const findAllCategory = await ResultsModel.find({
-    date: date,
-    categoryname: categoryname,
-  });
 
-  if (findAllCategory.length !== 0) {
-    res.status(200).json({
-      baseResponse: { message: "Fetch all", status: 1 },
-      data: findAllCategory,
+  try {
+    const findAllCategory = await ResultsModel.find({
+      date: date,
+      categoryname: categoryname,
     });
-  } else {
-    res
-      .status(200)
-      .json({ baseResponse: { message: "Not able to fetch", status: 0 } });
+
+    if (findAllCategory.length !== 0) {
+      // Sort the result array inside each document
+      const sortedData = findAllCategory.map((doc) => {
+        const sortedResult = [...doc.result].sort(
+          (a, b) => new Date(b.time) - new Date(a.time)
+        ); // latest first
+        return {
+          ...doc._doc,
+          result: sortedResult,
+        };
+      });
+
+      res.status(200).json({
+        baseResponse: { message: "Fetch all", status: 1 },
+        data: sortedData,
+      });
+    } else {
+      res
+        .status(200)
+        .json({ baseResponse: { message: "Not able to fetch", status: 0 } });
+    }
+  } catch (err) {
+    res.status(500).json({
+      baseResponse: { message: "Server error", status: 0 },
+      error: err.message,
+    });
   }
 };
 

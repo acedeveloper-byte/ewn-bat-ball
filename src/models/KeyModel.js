@@ -22,6 +22,7 @@ const categoryKeychema = new mongoose.Schema(
 				'dsw-4492',
 				'gzb-6208',
 				'gli-3094',
+				'md-9281',
 			],
 		},
 	},

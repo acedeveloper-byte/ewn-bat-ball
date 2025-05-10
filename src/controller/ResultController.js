@@ -6,7 +6,10 @@ const CreateNewResult = async (req, res) => {
 	const { categoryname, date, result, number, next_result, key, time } =
 		req.body;
 	const findExisting = await CategoryKeyModel.findOne({ key });
-	const findExistingCat = await ResultsModel.findOne({ categoryname });
+	const findExistingCat = await ResultsModel.findOne({
+		categoryname,
+		'result.time': time,
+	});
 
 	if (findExisting !== null) {
 		if (findExistingCat !== null) {

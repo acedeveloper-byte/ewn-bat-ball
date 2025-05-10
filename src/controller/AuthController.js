@@ -40,7 +40,6 @@ const login = async (req, res) => {
 // Body: { email, oldPassword, newPassword }
 const resetpassword = async (req, res) => {
 	const { email, oldPassword, newPassword } = req.body;
-	console.log(email, oldPassword, newPassword);
 	try {
 		// 1) Find user
 		const user = await User.findOne({ email });

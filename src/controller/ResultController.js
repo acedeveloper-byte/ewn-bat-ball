@@ -1,6 +1,7 @@
 const CategoryKeyModel = require('../models/KeyModel');
 const ResultsModel = require('../models/ResultModel');
 const Result = require('../models/ResultModel');
+const Result2 = require('../models/ScrapperResultModel');
 
 const CreateNewResult = async (req, res) => {
 	const { categoryname, date, result, number, next_result, key, time } =
@@ -53,12 +54,18 @@ const CreateNewResult = async (req, res) => {
 
 const FetchAllResult = async (req, res) => {
 	try {
+		// Fetch the latest results from both collections
 		const latestResult = await Result.find({}).sort({ createdAt: -1 });
+		const latestResult2 = await Result2.find({}).sort({ createdAt: -1 });
 
-		if (latestResult) {
+		// Combine both arrays into a single array
+		const combinedResults = [...latestResult, ...latestResult2];
+
+		// Check if there are results
+		if (combinedResults.length > 0) {
 			res.status(200).json({
-				message: 'Latest result fetched successfully',
-				data: latestResult,
+				message: 'Latest results fetched successfully',
+				data: combinedResults,
 			});
 		} else {
 			res.status(404).json({
@@ -68,7 +75,7 @@ const FetchAllResult = async (req, res) => {
 		}
 	} catch (error) {
 		res.status(500).json({
-			message: 'Error fetching latest result',
+			message: 'Error fetching latest results',
 			error: error.message,
 		});
 	}
@@ -105,7 +112,7 @@ const UpdateResult = async (req, res) => {
 		const udpdate = await ResultsModel.updateOne(
 			{ _id: _id }, // Match by categoryname
 			{
-				$push: { result: { time, number } }, // Add new entry to the result array
+				$push: { result: { time, number } }, // Add new 	entry to the result array
 				$set: { next_result }, // Update number and next_result fields
 			},
 			{ new: true, upsert: true }

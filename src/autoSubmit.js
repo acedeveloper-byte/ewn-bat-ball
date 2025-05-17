@@ -1,7 +1,9 @@
 const axios = require('axios');
 const moment = require('moment');
 
-const HOST = 'https://13.61.215.183'; // Replace with your backend API base URL
+// const HOST = 'http://localhost:5000/api';
+const HOST = 'https://13.61.215.183/api'; // Replace with your backend API base URL
+// Replace with your backend API base URL
 
 async function autoSubmitResult() {
 	try {
@@ -17,18 +19,21 @@ async function autoSubmitResult() {
 		const randomNum = Math.floor(Math.random() * 99) + 1;
 		const formattedNumber = randomNum.toString().padStart(2, '0');
 
+		// Format result time in 12-hour format (e.g., 03:15 PM)
+		const formattedTime = rounded.format('hh:mm A');
+
 		// Prepare post data
 		const postData = {
 			categoryname: 'Minidiswar',
-			time: rounded.toISOString(),
+			time: formattedTime, // only 12-hour time format
 			number: formattedNumber,
 			next_result: next.toISOString(),
-			result: [{ time: rounded.toISOString(), number: formattedNumber }],
+			result: [{ time: formattedTime, number: formattedNumber }],
 			date: moment().format('YYYY-MM-DD'),
 			key: 'md-9281',
 		};
 
-		// Post the result with auth token
+		// Post the result
 		const resultRes = await axios.post(
 			`${HOST}/result-with-authcode`,
 			postData,

@@ -187,17 +187,20 @@ const GetResultsWithDate = async (req, res) => {
 	const { date, categoryname } = req.params;
 
 	try {
-		const findAllCategory = await ResultsModel.find({
-			date: date,
-			categoryname: categoryname,
-		});
+		// Fetch data from both collections
+		const findAllCategory = await ResultsModel.find({ date, categoryname });
+		const findAllCategoryResult = await Result2.find({ date, categoryname });
 
-		if (findAllCategory.length !== 0) {
-			// Sort the result array inside each document
-			const sortedData = findAllCategory.map((doc) => {
+		// Combine both arrays
+		const combinedData = [...findAllCategory, ...findAllCategoryResult];
+
+		// If there's data, sort the combined results by time
+		if (combinedData.length !== 0) {
+			const sortedData = combinedData.map((doc) => {
+				// Sort each 'result' array inside each document
 				const sortedResult = [...doc.result].sort(
 					(a, b) => new Date(b.time) - new Date(a.time)
-				); // latest first
+				);
 				return {
 					...doc._doc,
 					result: sortedResult,
@@ -209,9 +212,9 @@ const GetResultsWithDate = async (req, res) => {
 				data: sortedData,
 			});
 		} else {
-			res
-				.status(200)
-				.json({ baseResponse: { message: 'Not able to fetch', status: 0 } });
+			res.status(200).json({
+				baseResponse: { message: 'Not able to fetch', status: 0 },
+			});
 		}
 	} catch (err) {
 		res.status(500).json({

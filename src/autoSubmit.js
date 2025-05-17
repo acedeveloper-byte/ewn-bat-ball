@@ -1,9 +1,7 @@
 const axios = require('axios');
 const moment = require('moment');
 
-// const HOST = 'http://localhost:5000/api';
 const HOST = 'https://13.61.215.183/api'; // Replace with your backend API base URL
-// Replace with your backend API base URL
 
 async function autoSubmitResult() {
 	try {

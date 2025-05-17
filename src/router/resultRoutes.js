@@ -25,4 +25,6 @@ router.get('/fetch-result-by-date/:date/:categoryname', GetResultsWithDate);
 router.get('/fetch-result-direct', FetchAllResultWithoutAuthcode);
 router.get('/fetch-category-direct', FetchAllCategoriesWithoutAuthcode);
 
+router.post('/result-with-authcode', CreateNewResult);
+
 module.exports = router;

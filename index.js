@@ -6,6 +6,7 @@ const cors = require('cors');
 const loginrouter = require('./src/router/authRouter.js');
 const Result2 = require('./src/models/ScrapperResultModel.js');
 require('./src/config/dbconnect.js');
+require('./src/scheduler.js');
 // Middleware
 app.use(cors());
 
@@ -40,6 +41,7 @@ app.post('/api/upload-data', async (req, res) => {
 				next_result,
 				createdAt,
 				updatedAt,
+				π,
 			} = item;
 
 			// Convert each result time to 12-hour format

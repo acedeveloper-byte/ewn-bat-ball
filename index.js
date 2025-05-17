@@ -33,18 +33,8 @@ app.post('/api/upload-data', async (req, res) => {
 		const data = req.body;
 
 		for (const item of data) {
-			const {
-				categoryname,
-				result,
-				date,
-				number,
-				next_result,
-				createdAt,
-				updatedAt,
-				π,
-			} = item;
+			const { categoryname, result, date, number, next_result } = item;
 
-			// Convert each result time to 12-hour format
 			const newResults = Array.isArray(result)
 				? result.map((r) => ({
 						...r,
@@ -52,30 +42,36 @@ app.post('/api/upload-data', async (req, res) => {
 				  }))
 				: [];
 
-			// Find existing document by categoryname
 			const existingDoc = await Result2.findOne({ categoryname });
 
 			if (existingDoc) {
-				// Get existing times to avoid duplicates
-				const existingTimes = existingDoc.result.map((r) => r.time);
-				const filteredResults = newResults.filter(
-					(r) => !existingTimes.includes(r.time)
-				);
+				// Append only unique result entries
+				const existingResults = existingDoc.result;
 
-				// Append only new time entries
+				const filteredResults = newResults.filter((newEntry) => {
+					// Check if an identical entry already exists
+					return !existingResults.some(
+						(existingEntry) =>
+							existingEntry.time === newEntry.time &&
+							existingEntry.value === newEntry.value
+						// Add more fields to compare if needed
+					);
+				});
+
 				if (filteredResults.length > 0) {
 					existingDoc.result.push(...filteredResults);
 				}
 
-				// Update additional fields
-				if (date) existingDoc.date = date;
-				if (number !== undefined) existingDoc.number = number;
-				if (next_result) existingDoc.next_result = next_result;
-				existingDoc.updatedAt = updatedAt || new Date().toISOString();
+				// Update only if fields have changed
+				if (date && date !== existingDoc.date) existingDoc.date = date;
+				if (number !== undefined && number !== existingDoc.number)
+					existingDoc.number = number;
+				if (next_result && next_result !== existingDoc.next_result)
+					existingDoc.next_result = next_result;
 
 				await existingDoc.save();
 			} else {
-				// Create new document if category doesn't exist
+				// Create new document
 				const newItem = new Result2({
 					categoryname,
 					date,
@@ -83,7 +79,6 @@ app.post('/api/upload-data', async (req, res) => {
 					number,
 					next_result,
 				});
-
 				await newItem.save();
 			}
 		}

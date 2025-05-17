@@ -19,4 +19,3 @@ loginrouter.post('/generate-otp', generateOtp);
 
 module.exports = loginrouter;
 module.exports = loginrouter;
-

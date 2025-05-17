@@ -29,11 +29,15 @@ async function autoSubmitResult() {
 		};
 
 		// Post the result with auth token
-		const resultRes = await axios.post(`${HOST}/result`, postData, {
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
+		const resultRes = await axios.post(
+			`${HOST}/result-with-authcode`,
+			postData,
+			{
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			}
+		);
 
 		console.log('Result submitted successfully:', resultRes.data);
 		return resultRes.data;

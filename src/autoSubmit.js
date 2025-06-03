@@ -11,8 +11,7 @@ async function autoSubmitResult() {
       .clone()
       .startOf("minute")
       .add(15 - (now.minute() % 15), "minutes");
-    const next = rounded.clone().add(15, "minutes");
-
+    
     // Generate random number string
     const randomNum = Math.floor(Math.random() * 99) + 1;
     const formattedNumber = randomNum.toString().padStart(2, "0");

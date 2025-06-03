@@ -6,59 +6,38 @@ const moment = require("moment");
 
 const CreateNewResult = async (req, res) => {
   try {
-    const { categoryname, date, number, next_result, key, time, mode } =
-      req.body;
+    const { categoryname, date, number, next_result, key, time, mode } = req.body;
 
-    // Format date and time
-    const formattedDate = moment(date, ["DD/MM/YY", "YYYY-MM-DD"]).format(
-      "YYYY-MM-DD"
-    );
+    const formattedDate = moment(date, ["DD/MM/YY", "YYYY-MM-DD"]).format("YYYY-MM-DD");
     const formattedTime = moment(time, ["HH:mm", "hh:mm A"]).format("hh:mm A");
 
-    // Find existing document
-    const existingDoc = await ResultsModel.findOne({
-      categoryname,
-    });
+    const existingDoc = await ResultsModel.findOne({ categoryname });
 
     if (existingDoc) {
-      // Look for today's date group
-      let dateGroupIndex = existingDoc.result.findIndex(
-        (r) => r.date === formattedDate
-      );
+      let dateGroupIndex = existingDoc.result.findIndex(r => r.date === formattedDate);
 
       if (dateGroupIndex !== -1) {
-        // Check for duplicate entry
-        const isDuplicate = existingDoc.result[dateGroupIndex].times.some(
-          (entry) => entry.time === formattedTime && entry.number === number
-        );
+       const isDuplicate = existingDoc.result[dateGroupIndex].times.some(
+  (entry) => entry.time === formattedTime
+);
 
         if (isDuplicate) {
           return res.status(200).json({
-            message: "Result already exists. No changes made.",
+            message: "Duplicate time entry detected. No changes made.",
             data: existingDoc,
           });
         }
 
-        // Push new result time to times array
-        existingDoc.result[dateGroupIndex].times.push({
-          time: formattedTime,
-          number,
-        });
-
-        // Mark nested path as modified
+        existingDoc.result[dateGroupIndex].times.push({ time: formattedTime, number });
         existingDoc.markModified(`result.${dateGroupIndex}.times`);
       } else {
-        // New date group for a new day
         existingDoc.result.push({
           date: formattedDate,
           times: [{ time: formattedTime, number }],
         });
-
-        // Mark entire result as modified since new dateGroup added
         existingDoc.markModified("result");
       }
 
-      // Update next_result if changed
       if (next_result && existingDoc.next_result !== next_result) {
         existingDoc.next_result = next_result;
       }
@@ -70,7 +49,6 @@ const CreateNewResult = async (req, res) => {
         data: existingDoc,
       });
     } else {
-      // Create a new document
       const newResult = new ResultsModel({
         categoryname,
         date: formattedDate,
@@ -101,6 +79,7 @@ const CreateNewResult = async (req, res) => {
     });
   }
 };
+
 
 const FetchAllResult = async (req, res) => {
   try {
@@ -228,24 +207,7 @@ const FetchAllResultWithoutAuthcode = async (req, res) => {
   }
 };
 
-// Helper to convert "hh:mm AM/PM" to a comparable timestamp number
-function parseTimeToDate(timeStr) {
-	if (!timeStr) return 0;
-	const now = new Date();
-	const parts = timeStr.split(' ');
-	let time = parts[0];
-	let modifier = parts[1] || '';
-	let [hours, minutes] = time.split(':').map(Number);
-	if (modifier === 'PM' && hours !== 12) hours += 12;
-	if (modifier === 'AM' && hours === 12) hours = 0;
-	return new Date(
-		now.getFullYear(),
-		now.getMonth(),
-		now.getDate(),
-		hours,
-		minutes
-	).getTime();
-}
+
 
 const UpdateResult = async (req, res) => {
   const { _id } = req.params;
@@ -575,7 +537,3 @@ module.exports = {
   FetchAllResultWithoutAuthcode,
   FetchResultsByMonth,
 };
-
-// mini no entry
-// scrapper changes
-//  double entry

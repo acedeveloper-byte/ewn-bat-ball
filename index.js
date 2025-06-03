@@ -20,7 +20,6 @@ app.get("/api/hello", (req, res) => {
 });
 
 app.post("/api/upload-data", async (req, res) => {
-  console.log(req.body);
   try {
     const { categoryname, date, time, result, number, next_result, mode } =
       req.body;

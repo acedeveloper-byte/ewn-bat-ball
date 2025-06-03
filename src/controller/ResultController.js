@@ -228,6 +228,25 @@ const FetchAllResultWithoutAuthcode = async (req, res) => {
   }
 };
 
+// Helper to convert "hh:mm AM/PM" to a comparable timestamp number
+function parseTimeToDate(timeStr) {
+	if (!timeStr) return 0;
+	const now = new Date();
+	const parts = timeStr.split(' ');
+	let time = parts[0];
+	let modifier = parts[1] || '';
+	let [hours, minutes] = time.split(':').map(Number);
+	if (modifier === 'PM' && hours !== 12) hours += 12;
+	if (modifier === 'AM' && hours === 12) hours = 0;
+	return new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate(),
+		hours,
+		minutes
+	).getTime();
+}
+
 const UpdateResult = async (req, res) => {
   const { _id } = req.params;
   const { categoryname, time, number, next_result } = req.body;
@@ -556,3 +575,7 @@ module.exports = {
   FetchAllResultWithoutAuthcode,
   FetchResultsByMonth,
 };
+
+// mini no entry
+// scrapper changes
+//  double entry

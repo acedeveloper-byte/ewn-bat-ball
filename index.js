@@ -19,81 +19,75 @@ app.get("/api/hello", (req, res) => {
   res.json({ message: "Hello from Vercel Serverless!" });
 });
 
-// Helper function to convert 24-hour time to 12-hour format
-function convertTo12HourFormat(time24) {
-  const [hourStr, minute] = time24.split(":");
-  let hour = parseInt(hourStr, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  hour = hour % 12 || 12; // Convert 0 (midnight) or 12 (noon) to 12
-  return `${hour.toString().padStart(2, "0")}:${minute} ${ampm}`;
-}
-
 app.post("/api/upload-data", async (req, res) => {
+  console.log(req.body);
   try {
-    const data = req.body;
+    const { categoryname, date, time, result, number, next_result, mode } =
+      req.body;
 
-    for (const item of data) {
-      const { categoryname, result, date, number, next_result } = item;
-
-      const newResults = Array.isArray(result)
-        ? result.map((r) => ({
-            ...r,
-            time: convertTo12HourFormat(r.time),
-          }))
-        : [];
-
-      const existingDoc = await Result2.findOne({ categoryname });
-
-      if (existingDoc) {
-        // Append only unique result entries
-        const existingResults = existingDoc.result;
-
-        const filteredResults = newResults.filter((newEntry) => {
-          // Check if an identical entry already exists
-          return !existingResults.some(
-            (existingEntry) =>
-              existingEntry.time === newEntry.time &&
-              existingEntry.value === newEntry.value
-            // Add more fields to compare if needed
-          );
-        });
-
-        if (filteredResults.length > 0) {
-          existingDoc.result.push(...filteredResults);
-        }
-
-        // Update only if fields have changed
-        if (date && date !== existingDoc.date) existingDoc.date = date;
-        if (number !== undefined && number !== existingDoc.number)
-          existingDoc.number = number;
-        if (next_result && next_result !== existingDoc.next_result)
-          existingDoc.next_result = next_result;
-
-        await existingDoc.save();
-      } else {
-        // Create new document
-        const newItem = new Result2({
-          categoryname,
-          date,
-          result: newResults,
-          number,
-          next_result,
-        });
-        await newItem.save();
-      }
+    if (!categoryname || !date || !time || !result || !number || !next_result) {
+      return res.status(400).json({ message: "Missing required fields." });
     }
 
-    res.status(200).json({ message: "Data successfully uploaded or updated" });
-  } catch (err) {
+    // Check if document with the categoryname exists
+    const existingDoc = await Result2.findOne({ categoryname });
+
+    if (!existingDoc) {
+      // Create new document
+      const newDoc = new Result2({
+        categoryname,
+        date: date,
+        result: [{ time: time, number: number, date: date }], // expects: [{ time: '...', number: '...' }]
+        number,
+        next_result: time,
+        mode,
+        mode,
+      });
+
+      await newDoc.save();
+
+      return res.status(201).json({
+        message: "New category created and result added.",
+        data: newDoc,
+      });
+    }
+
+    // If document exists, check if this result already exists
+    const incomingTime = time;
+    const incomingNumber = number;
+
+    const alreadyExists = existingDoc.result.some(
+      (entry) => entry.time == incomingTime && entry.number == incomingNumber
+    );
+
+    if (alreadyExists) {
+      return res.status(200).json({
+        message: "Result entry already exists. No update performed.",
+      });
+    }
+
+    // Push new result to existing document
+    const save = await Result2.updateOne(
+      { categoryname },
+      {
+        $push: { result: { time: time, number: number, date } },
+        $set: { next_result: time, number, mode, date },
+      }
+    );
+    console.log("save , save", save);
+    return res.status(200).json({
+      message: "Result added to existing category.",
+      response: save,
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
     res.status(500).json({
-      message: "Error uploading data",
-      error: err.message,
+      message: "Internal server error",
+      error: error.message,
     });
   }
 });
 
 app.listen(5000);
-// Export handler for Vercel
-module.exports = app;
 
-// module.exports.handler = serverless(app);
+module.exports = app;

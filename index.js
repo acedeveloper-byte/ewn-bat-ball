@@ -9,8 +9,8 @@ require("./src/config/dbconnect.js");
 require("./src/scheduler.js");
 // Middleware
 app.use(cors());
-
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api", router);
 app.use("/api", loginrouter);
 
@@ -29,17 +29,18 @@ app.post("/api/upload-data", async (req, res) => {
     }
 
     // Check if document with the categoryname exists
-    const existingDoc = await Result2.findOne({ categoryname });
+    const existingDoc = await Result2.findOne({
+      categoryname: { $regex: new RegExp(`^${categoryname}$`, "i") },
+    });
 
     if (!existingDoc) {
       // Create new document
       const newDoc = new Result2({
         categoryname,
-        date: date,
-        result: [{ time: time, number: number, date: date }], // expects: [{ time: '...', number: '...' }]
+        date,
+        result: [{ time, number, date }],
         number,
         next_result: time,
-        mode,
         mode,
       });
 
@@ -51,33 +52,44 @@ app.post("/api/upload-data", async (req, res) => {
       });
     }
 
-    // If document exists, check if this result already exists
-    const incomingTime = time;
-    const incomingNumber = number;
-
-    const alreadyExists = existingDoc.result.some(
-      (entry) => entry.time == incomingTime && entry.number == incomingNumber
+    // Check if result for the same date and time already exists
+    const existingIndex = existingDoc.result.findIndex(
+      (entry) => entry.date === date && entry.time === time
     );
 
-    if (alreadyExists) {
+    if (existingIndex !== -1) {
+      // Update the existing result's number
+      existingDoc.result[existingIndex].number = number;
+
+      // Update other fields
+      existingDoc.number = number;
+      existingDoc.next_result = time;
+      existingDoc.mode = mode;
+      existingDoc.date = date;
+
+      await existingDoc.save();
+
       return res.status(200).json({
-        message: "Result entry already exists. No update performed.",
+        message: "Existing result updated.",
+        data: existingDoc,
+      });
+    } else {
+      // Add new result to the existing document
+      existingDoc.result.push({ time, number, date });
+
+      // Update other fields
+      existingDoc.number = number;
+      existingDoc.next_result = time;
+      existingDoc.mode = mode;
+      existingDoc.date = date;
+
+      await existingDoc.save();
+
+      return res.status(200).json({
+        message: "New result added to existing category.",
+        data: existingDoc,
       });
     }
-
-    // Push new result to existing document
-    const save = await Result2.updateOne(
-      { categoryname },
-      {
-        $push: { result: { time: time, number: number, date } },
-        $set: { next_result: time, number, mode, date },
-      }
-    );
-    console.log("save , save", save);
-    return res.status(200).json({
-      message: "Result added to existing category.",
-      response: save,
-    });
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({

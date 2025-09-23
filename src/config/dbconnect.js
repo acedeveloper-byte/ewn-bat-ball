@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const mongoURI =
-  "mongodb+srv://nexsolvesolutions:34598345790237598714327534@cluster0.ecnexqv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+  "mongodb+srv://nexsolvesolutions:34598345790237598714327534@cluster0.ecnexqv.mongodb.net?retryWrites=true&w=majority&appName=Cluster0";
 
 mongoose.connect(mongoURI);
 

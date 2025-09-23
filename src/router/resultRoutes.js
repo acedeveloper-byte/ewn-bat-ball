@@ -9,6 +9,8 @@ const {
   FetchAllResultWithoutAuthcode,
   FetchAllCategoriesWithoutAuthcode,
   FetchResultsByMonth,
+  getresultbyId,
+  deleteTimeEntry,
 } = require("../controller/ResultController");
 const authenticate = require("../middleware/authMiddleware");
 const router = express.Router();
@@ -31,5 +33,7 @@ router.get(
   "/fetch-results-by-month/:selectedDate/:categoryname/:mode",
   FetchResultsByMonth
 );
+router.get("/result/:id", authenticate, getresultbyId);
+router.patch("/delete-existing-result/:id", authenticate, deleteTimeEntry);
 
 module.exports = router;

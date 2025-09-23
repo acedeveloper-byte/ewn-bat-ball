@@ -1,8 +1,9 @@
 const express = require("express");
 const app = express();
-const serverless = require("serverless-http");
-const router = require("./src/router/resultRoutes.js");
+const redis = require("./src/redisClient.js"); //const router = require("./src/router/resultRoutes.js");
 const cors = require("cors");
+const router = require("./src/router/resultRoutes.js");
+
 const loginrouter = require("./src/router/authRouter.js");
 const Result2 = require("./src/models/ScrapperResultModel.js");
 require("./src/config/dbconnect.js");
@@ -28,8 +29,17 @@ app.post("/api/upload-data", async (req, res) => {
       return res.status(400).json({ message: "Missing required fields." });
     }
 
+    // Format date & time
+    const formattedDate = moment(date, ["DD/MM/YY", "YYYY-MM-DD"]).format(
+      "YYYY-MM-DD"
+    );
+    const formattedTime = moment(time, ["HH:mm", "hh:mm A"]).format("hh:mm A");
+
+    // Redis cache key
+    const cacheKey = `results:${categoryname}:${formattedDate}`;
+
     // Check if document with the categoryname exists
-    const existingDoc = await Result2.findOne({
+    let existingDoc = await Result2.findOne({
       categoryname: { $regex: new RegExp(`^${categoryname}$`, "i") },
     });
 
@@ -37,14 +47,17 @@ app.post("/api/upload-data", async (req, res) => {
       // Create new document
       const newDoc = new Result2({
         categoryname,
-        date,
-        result: [{ time, number, date }],
+        date: formattedDate,
+        result: [{ date: formattedDate, time: formattedTime, number }],
         number,
-        next_result: time,
+        next_result: formattedTime,
         mode,
       });
 
       await newDoc.save();
+
+      // ? Update Redis cache
+      await redis.set(cacheKey, newDoc, { ex: 120 });
 
       return res.status(201).json({
         message: "New category created and result added.",
@@ -54,42 +67,39 @@ app.post("/api/upload-data", async (req, res) => {
 
     // Check if result for the same date and time already exists
     const existingIndex = existingDoc.result.findIndex(
-      (entry) => entry.date === date && entry.time === time
+      (entry) => entry.date === formattedDate && entry.time === formattedTime
     );
 
     if (existingIndex !== -1) {
       // Update the existing result's number
       existingDoc.result[existingIndex].number = number;
-
-      // Update other fields
-      existingDoc.number = number;
-      existingDoc.next_result = time;
-      existingDoc.mode = mode;
-      existingDoc.date = date;
-
-      await existingDoc.save();
-
-      return res.status(200).json({
-        message: "Existing result updated.",
-        data: existingDoc,
-      });
     } else {
       // Add new result to the existing document
-      existingDoc.result.push({ time, number, date });
-
-      // Update other fields
-      existingDoc.number = number;
-      existingDoc.next_result = time;
-      existingDoc.mode = mode;
-      existingDoc.date = date;
-
-      await existingDoc.save();
-
-      return res.status(200).json({
-        message: "New result added to existing category.",
-        data: existingDoc,
+      existingDoc.result.push({
+        date: formattedDate,
+        time: formattedTime,
+        number,
       });
     }
+
+    // Update other fields
+    existingDoc.number = number;
+    existingDoc.next_result = formattedTime;
+    existingDoc.mode = mode;
+    existingDoc.date = formattedDate;
+
+    await existingDoc.save();
+
+    // ? Update Redis cache
+    await redis.set(cacheKey, existingDoc, { ex: 120 });
+
+    return res.status(200).json({
+      message:
+        existingIndex !== -1
+          ? "Existing result updated."
+          : "New result added to existing category.",
+      data: existingDoc,
+    });
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({

@@ -1,7 +1,7 @@
 const axios = require("axios");
 const moment = require("moment-timezone");
-const HOST = "http://localhost:5000/api"; // Replace with your backend API base URL
-// const HOST = "https://13.61.215.183/api"; // Replace with your backend API base URL
+// const HOST = "http://localhost:5000/api"; // Replace with your backend API base URL
+const HOST = "https://13.61.215.183/api"; // Replace with your backend API base URL
 
 async function autoSubmitResult() {
   try {
@@ -11,7 +11,7 @@ async function autoSubmitResult() {
       .clone()
       .startOf("minute")
       .add(15 - (now.minute() % 15), "minutes");
-    
+
     // Generate random number string
     const randomNum = Math.floor(Math.random() * 99) + 1;
     const formattedNumber = randomNum.toString().padStart(2, "0");

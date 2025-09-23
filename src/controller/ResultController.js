@@ -175,7 +175,6 @@ const FetchAllResultWithoutAuthcode = async (req, res) => {
     // 🔹 Check Redis cache first
     const cachedData = await redis.get(cacheKey);
     if (cachedData) {
-      console.log("✅ Returning data from Upstash Redis cache");
       return res.status(200).json({
         message: "Results fetched successfully (from cache)",
         data: cachedData, // 👈 Parse back to object
@@ -192,19 +191,18 @@ const FetchAllResultWithoutAuthcode = async (req, res) => {
         entryDate.month() === currentMonth && entryDate.year() === currentYear
       );
     };
-
     const filteredResults = latestResult.map((doc) => {
       const filteredResult = doc.result
         .filter((entry) => isCurrentMonth(entry.date))
         .map((entry) => {
           if (entry.date === today) {
-            // ✅ Sort times in descending order so the latest entry comes first
+            // ✅ Sort times in ascending order
             const sortedTimes = entry.times
               .filter((t) =>
                 moment(t.time, "hh:mm A").isSameOrBefore(currentTime)
               )
               .sort((a, b) =>
-                moment(b.time, "hh:mm A").diff(moment(a.time, "hh:mm A"))
+                moment(a.time, "hh:mm A").diff(moment(b.time, "hh:mm A"))
               );
 
             return { ...entry, times: sortedTimes };

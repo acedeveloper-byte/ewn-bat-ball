@@ -66,8 +66,8 @@ const CreateNewResult = async (req, res) => {
 					.map((t) => t.time);
 
 				if (duplicateTimes.length > 0) {
-					return res.status(400).json({
-						message: `Duplicate time(s) detected: ${duplicateTimes.join(', ')}`,
+					return res.status(200).json({
+						message: `Duplicate time(s) detected`,
 					});
 				}
 
@@ -261,7 +261,7 @@ const UpdateResult = async (req, res) => {
 
 		if (updated.matchedCount === 0) {
 			return res
-				.status(404)
+				.status(200)
 				.json({ message: 'No matching date/time entry found' });
 		}
 
@@ -271,7 +271,7 @@ const UpdateResult = async (req, res) => {
 		});
 	} catch (err) {
 		console.error('Update error:', err);
-		res.status(500).json({
+		res.status(200).json({
 			message: 'Internal Server Error',
 			error: err.message,
 		});

@@ -7,90 +7,111 @@ const ResultsModel = require('../models/ResultModel');
 const Result = require('../models/ResultModel');
 const Result2 = require('../models/ScrapperResultModel');
 const moment = require('moment');
+// Safe time formatter to accept multiple frontend formats
+function safeFormatTime(rawTime) {
+	if (!rawTime) return null;
+	// Accept 24-hour, 12-hour with space, and 12-hour without space (e.g., 07:15PM)
+	const m = moment(rawTime, ['HH:mm', 'hh:mm A', 'hh:mma'], true);
+	return m.isValid() ? m.format('hh:mm A') : null;
+}
+
+function addUniqueTime(timesArray, time, number) {
+	if (!time) return;
+	const exists = timesArray.some((entry) => entry.time === time);
+	if (!exists) timesArray.push({ time, number });
+}
 
 const CreateNewResult = async (req, res) => {
 	try {
-		const { categoryname, date, number, next_result, key, time, mode } =
-			req.body;
+		const {
+			categoryname,
+			date,
+			number,
+			next_result,
+			next_time,
+			key,
+			time,
+			mode,
+		} = req.body;
 
-		const formattedDate = moment(date, ['DD/MM/YY', 'YYYY-MM-DD']).format(
+		const formattedDate = moment(date, ['DD/MM/YY', 'YYYY-MM-DD'], true).format(
 			'YYYY-MM-DD'
 		);
-		const formattedTime = moment(time, ['HH:mm', 'hh:mm A']).format('hh:mm A');
+		const formattedTime = safeFormatTime(time);
+		const formattedNextTime = safeFormatTime(next_time);
 
-		const existingDoc = await ResultsModel.findOne({ categoryname });
+		if (!formattedTime) {
+			return res
+				.status(400)
+				.json({ message: 'Invalid or missing time format' });
+		}
 
-		if (existingDoc) {
-			let dateGroupIndex = existingDoc.result.findIndex(
-				(r) => r.date === formattedDate
-			);
+		const timesToAdd = [];
+		if (formattedTime) timesToAdd.push({ time: formattedTime, number });
+		if (formattedNextTime && next_result)
+			timesToAdd.push({ time: formattedNextTime, number: next_result });
 
-			if (dateGroupIndex !== -1) {
-				const isDuplicate = existingDoc.result[dateGroupIndex].times.some(
-					(entry) => entry.time === formattedTime
-				);
+		let doc = await ResultsModel.findOne({ categoryname });
 
-				if (isDuplicate) {
-					return res.status(200).json({
-						message: 'Duplicate time entry detected. No changes made.',
-						data: existingDoc,
+		if (doc) {
+			// Find date group
+			let dateGroup = doc.result.find((r) => r.date === formattedDate);
+
+			// If date group exists, check for duplicate times
+			if (dateGroup) {
+				const duplicateTimes = timesToAdd
+					.filter((t) =>
+						dateGroup.times.some((existing) => existing.time === t.time)
+					)
+					.map((t) => t.time);
+
+				if (duplicateTimes.length > 0) {
+					return res.status(400).json({
+						message: `Duplicate time(s) detected: ${duplicateTimes.join(', ')}`,
 					});
 				}
 
-				existingDoc.result[dateGroupIndex].times.push({
-					time: formattedTime,
-					number,
-				});
-				existingDoc.markModified(`result.${dateGroupIndex}.times`);
-			} else {
-				existingDoc.result.push({
-					date: formattedDate,
-					times: [{ time: formattedTime, number }],
-				});
-				existingDoc.markModified('result');
-			}
-
-			if (next_result && existingDoc.next_result !== next_result) {
-				existingDoc.next_result = next_result;
-			}
-
-			await existingDoc.save();
-
-			// Update Redis cache after saving the new result
-			const cacheKey = `results:${categoryname}:${formattedDate}`;
-			await redis.set(cacheKey, existingDoc, { ex: 120 }); // Cache for 2 minutes
-
-			return res.status(200).json({
-				message: 'New result added successfully',
-				data: existingDoc,
-			});
-		} else {
-			const newResult = new ResultsModel({
-				categoryname,
-				date: formattedDate,
-				result: [
+				// Use $push to add new times to existing date group
+				await ResultsModel.updateOne(
+					{ categoryname, 'result.date': formattedDate },
 					{
-						date: formattedDate,
-						times: [{ time: formattedTime, number }],
-					},
-				],
-				number,
-				next_result,
+						$push: { 'result.$.times': { $each: timesToAdd } },
+						$set: { next_result },
+					}
+				);
+			} else {
+				// Date group does not exist → create new date group
+				await ResultsModel.updateOne(
+					{ categoryname },
+					{
+						$push: { result: { date: formattedDate, times: timesToAdd } },
+						$set: { next_result },
+					}
+				);
+			}
+
+			// Fetch updated document
+			doc = await ResultsModel.findOne({ categoryname });
+		} else {
+			// New document
+			doc = await ResultsModel.create({
+				categoryname,
 				key,
 				mode,
-			});
-
-			await newResult.save();
-
-			// Cache the newly created result
-			const cacheKey = `results:${categoryname}:${formattedDate}`;
-			await redis.set(cacheKey, newResult, { ex: 120 }); // Cache for 2 minutes
-
-			return res.status(201).json({
-				message: 'Result created successfully',
-				data: newResult,
+				number,
+				next_result,
+				result: [{ date: formattedDate, times: timesToAdd }],
 			});
 		}
+
+		// Cache for 2 minutes
+		const cacheKey = `results:${categoryname}:${formattedDate}`;
+		await redis.set(cacheKey, doc, { ex: 120 });
+
+		return res.status(200).json({
+			message: 'Result saved successfully',
+			data: doc,
+		});
 	} catch (error) {
 		console.error('Error in CreateNewResult:', error);
 		return res.status(500).json({
@@ -102,63 +123,37 @@ const CreateNewResult = async (req, res) => {
 
 const FetchAllResult = async (req, res) => {
 	try {
-		const currentTime = moment(); // current datetime
+		const currentTime = moment();
 		const today = currentTime.format('YYYY-MM-DD');
-		const currentMonth = currentTime.month();
-		const currentYear = currentTime.year();
-		const latestResult = await Result.find({}).sort({ createdAt: -1 });
-		const latestResult2 = await Result2.find({}).sort({ createdAt: -1 });
-		const isCurrentMonth = (dateStr) => {
-			const entryDate = moment(dateStr, 'YYYY-MM-DD');
-			return (
-				entryDate.month() === currentMonth && entryDate.year() === currentYear
-			);
-		};
+		const currentMoment = moment(currentTime, 'HH:mm A');
+
+		// ✅ Query Result collection: fetch only today's entries
+		const latestResult = await Result.find(
+			{ 'result.date': today },
+			{ 'result.$': 1, categoryname: 1, next_result: 1, createdAt: 1 }
+		).sort({ createdAt: -1 });
+
 		const filteredResults = latestResult.map((doc) => {
-			const filteredResult = doc.result
-				.filter((entry) => isCurrentMonth(entry.date))
-				.map((entry) => {
-					if (entry.date === today) {
-						// ✅ Sort times in ascending order
-						const sortedTimes = entry.times
-							.filter((t) =>
-								moment(t.time, 'hh:mm A').isSameOrBefore(currentTime)
-							)
-							.sort((a, b) =>
-								moment(a.time, 'hh:mm A').diff(moment(b.time, 'hh:mm A'))
-							);
-
-						return { ...entry, times: sortedTimes };
-					}
-					return entry;
-				});
-
-			return { ...doc, result: filteredResult };
-		});
-
-		const filteredResults2 = latestResult2.map((doc) => {
-			// Filter only today's results and past/current times
-			const filteredResult = doc.result
-				.filter((entry) => entry.date === today)
-				.filter((entry) =>
-					moment(entry.time, 'hh:mm A').isSameOrBefore(currentTime)
-				)
-				.sort((a, b) =>
-					moment(a.time, 'hh:mm A').diff(moment(b.time, 'hh:mm A'))
-				);
+			const entry = doc.result[0]; // only today's due to $ projection
+			const sortedTimes = entry.times.sort(
+				(a, b) => moment(b.time, 'hh:mm A').diff(moment(a.time, 'hh:mm A')) // 🔄 Descending
+			);
 
 			return {
 				...doc._doc,
-				result: filteredResult,
+				result: [{ ...entry._doc, times: sortedTimes }],
 			};
 		});
 
-		const combined = [...filteredResults, ...filteredResults2];
+		// ✅ Merge both
+		const combined = [...filteredResults];
+
 		res.status(200).json({
 			message: 'Results fetched successfully',
-			data: combined,
+			data: latestResult,
 		});
 	} catch (error) {
+		console.error('Error in FetchAllResult:', error);
 		res.status(500).json({
 			message: 'Error fetching results',
 			error: error.message,
@@ -282,6 +277,7 @@ const UpdateResult = async (req, res) => {
 		});
 	}
 };
+
 const AddKeyForResultUpdation = async (req, res) => {
 	const { key, categoryname } = req.body;
 
@@ -472,7 +468,6 @@ const FetchResultsByMonth = async (req, res) => {
 		// ✅ Try Redis cache first
 		const cachedData = await redis.get(cacheKey);
 		if (cachedData) {
-			console.log('✅ Returning data from Redis cache');
 			return res.status(200).json(cachedData);
 		}
 
@@ -675,6 +670,16 @@ const deleteTimeEntry = async (req, res) => {
 	}
 };
 
+const fetchAllFuckingResult = async (req, res) => {
+	try {
+		const findAll = await ResultsModel.find(); // ✅ executes the query
+		res.status(200).json({ response: findAll });
+	} catch (err) {
+		console.error('Error fetching results:', err);
+		res.status(500).json({ message: 'Server error', error: err.message });
+	}
+};
+
 module.exports = {
 	CreateNewResult,
 	FetchAllResult,
@@ -687,4 +692,5 @@ module.exports = {
 	FetchResultsByMonth,
 	getresultbyId,
 	deleteTimeEntry,
+	fetchAllFuckingResult,
 };
